@@ -24,6 +24,26 @@ const params = {
     exposure: 1
 };
 
+// ===================== SHADERS =====================
+const vertexShader = `
+    varying vec2 vUv;
+
+    void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+    }
+`;
+
+const fragmentShader = `
+    uniform sampler2D baseTexture;
+    uniform sampler2D bloomTexture;
+
+    varying vec2 vUv;
+
+    void main() {
+        gl_FragColor = ( texture2D( baseTexture, vUv ) + vec4( 1.0 ) * texture2D( bloomTexture, vUv ) );
+    }
+`;
 
 
 
@@ -34,19 +54,36 @@ labelRenderer.domElement.style.position = 'absolute';
 labelRenderer.domElement.style.top = '0px';
 
 const sphere_positions = {
-    "electronic": [-0.051, 0.178, 0.065],
-
+    "arduino": [0, -0.4, -0.8],
+    "piezoSensor": [0.6,0.35,0.15],
+    "accelerometer": [0,0,-0.95],
+    "knitting": [0,0.65,0.5],
 };
 
 
 
-const spheres_description = {
-    "electronic": {desc : "The electronic part of the project is composed of many elements :\n\
-     - an ESP32\n\
-     - an amplification circuit with a speaker\n\
-     - an electronical filter to capture the touch interaction with the cask\n\
-     Click on the sphere to reach the github repository.",
-                        link: "https://github.com/timotheepopesco"},
+const infosbulles_description = {
+    "arduino": 
+    {
+        desc : "ESP32 Beetle",
+        link: "https://github.com/TimotheePopesco/Course_TreeJS/tree/main/assets/infos/esp32.md"
+    },
+
+    "piezoSensor": 
+    {
+        desc : "PiezoSensor",
+        link: "https://github.com/TimotheePopesco/Course_TreeJS/tree/main/assets/infos/piezo.md"
+    },
+    "accelerometer": 
+    {
+        desc : "Accelerometer",
+        link: "https://github.com/TimotheePopesco/Course_TreeJS/tree/main/assets/infos/accelerometer.md"
+    },
+    "knitting": 
+    {
+        desc : "knitting",
+        link: "https://github.com/TimotheePopesco/Course_TreeJS/tree/main/assets/infos/knitting.md"
+    },
 };
 
 // --------01 DEFINITION DE LA SCENE-------------------
@@ -92,12 +129,13 @@ const mixPass = new ShaderPass(
     new THREE.ShaderMaterial({
         uniforms: {
             baseTexture: { value: null },
-            bloomTexture: { value: bloomComposer.renderTarget2.texture }
+            bloomTexture: { value: bloomComposer.renderTarget2.texture },
         },
-        vertexShader: document.getElementById('vertexshader').textContent,
-        fragmentShader: document.getElementById('fragmentshader').textContent,
-        defines: {}
-    }), 'baseTexture'
+        vertexShader: vertexShader,   // Utilisation du vertexShader
+        fragmentShader: fragmentShader, // Utilisation du fragmentShader
+        defines: {},
+    }),
+    'baseTexture'
 );
 mixPass.needsSwap = true;
 
@@ -141,11 +179,11 @@ function render() {
     labelRenderer.render(scene, camera);
 
 }
-// Spheres setup
+// infosbulles setup
 class ClickableSphere{
     constructor(x,y,z, radius, color, name){
         this.name = name
-        this.geometry = new THREE.SphereGeometry(radius, 10, 10);
+        this.geometry = new THREE.SphereGeometry(radius, 4, 4);
         this.material = new THREE.MeshBasicMaterial({color: color,
             wireframe: true,
             opacity: 0.5,
@@ -162,15 +200,11 @@ class ClickableSphere{
     create2DLabel() {
         this.description_div = document.createElement('div');
         this.description_div.className = 'labels';
-        this.description_div.innerText = spheres_description[this.name]["desc"];
+        this.description_div.innerText = infosbulles_description[this.name]["desc"];
 
-
-    
         this.description_label = new CSS2DObject(this.description_div);
-        // Set the label's position based on the sphere's coordinates
-        this.description_label.position.set(0.1, 0.1, 0); // Relative to the sphere
+        this.description_label.position.set(0.1, 0.1, 0);
         this.description_label.scale.set(1, 1, 1);
-        // Hide the label by default
         this.description_label.element.style.visibility = "hidden";
         this.description_label.name = this.name;
         this.mesh.add(this.description_label);
@@ -180,55 +214,40 @@ class ClickableSphere{
         console.log("Clicked : " + this.name);
         // Open the link in a new tab
         let link = document.createElement('a');
-        link.href = spheres_description[this.name]["link"];
+        link.href = infosbulles_description[this.name]["link"];
         link.target = "_blank";
         link.click();
 
     }
     onHover(){
         console.log("Hovered : " + this.name);
-        this.material.color.setHex(0x00ff00);
+        this.material.color.setHex(0xFF00FF);
         this.description_label.element.style.visibility = "visible";
-        // $('html,body').css('cursor', 'pointer');
         document.body.style.cursor = "pointer";
-        // Add text in description box
-        // let description_box = document.getElementsByClassName("description");
-        // description_box[0].innerHTML = spheres_description[this.name];
     }
     defaultState(){
-        this.material.color.setHex(0x99C1F1);
+        this.material.color.setHex(0x800080);
         this.description_label.element.style.visibility = "hidden";
         document.body.style.cursor = "default";
-        // let description_box = document.getElementsByClassName("description");
-        // description_box[0].innerHTML = "";
     }
 
 }
 let main_group = new THREE.Group();
-let spheres_group = new THREE.Group();
-main_group.add(spheres_group);
+let infosbulles_group = new THREE.Group();
+main_group.add(infosbulles_group);
 
-
-
-// Generate spheres
-let spheres = {};
+let infosbulles = {};
 for (let key in sphere_positions){
-    // Add sphere with uuid as key
-
     let new_sphere = new ClickableSphere(sphere_positions[key][0], sphere_positions[key][1], sphere_positions[key][2], 0.15, 0x99C1F1, key);
-    spheres[key] = new_sphere;
-    spheres_group.add(spheres[key].mesh);
+    infosbulles[key] = new_sphere;
+    infosbulles_group.add(infosbulles[key].mesh);
 }
 
 let loader = new GLTFLoader();
 let loaded = false;
-// ----------------------START CONNERIES------------------------------------
-
-
-let currentModel = "cask.glb"; // Modèle initial
+let currentModel = "cask.glb"; 
 let caskModel;
 
-// Boutons
 const switchModelButton = document.getElementById("switch-model-button");
 const shakeButton = document.getElementById("shake-button");
 let graphContainer = document.getElementById('graph-container');
@@ -274,7 +293,6 @@ function initializeGraph() {
 function updateGraph(isShaking = false) {
     if (!shockChart) return;
 
-    // Générer des données aléatoires
     const newData = isShaking 
         ? Array.from({length: 50}, () => Math.random() * 0.8) 
         : Array(50).fill(0);
@@ -287,17 +305,14 @@ function updateGraph(isShaking = false) {
     shockChart.update();
 }
 
-// Fonction pour charger un modèle
 function loadModel(modelPath) {
     loader.load(
         `assets/img/${modelPath}`,
         function (gltf) {
-            // Si un modèle précédent existe, le retirer
             if (caskModel) {
                 main_group.remove(caskModel);
             }
 
-            // Charger le nouveau modèle
             caskModel = gltf.scene;
             caskModel.position.set(0, 0, 0);
             caskModel.scale.set(1, 1, 1);
@@ -306,10 +321,7 @@ function loadModel(modelPath) {
             main_group.add(caskModel);
             loaded = true;
 
-            // Mettre à jour l'interface en fonction du modèle
             updateUI();
-
-            // Cacher le chargement
             document.getElementById("loading").style.display = "none";
         },
         function (xhr) {
@@ -321,49 +333,39 @@ function loadModel(modelPath) {
     );
 }
 
-// Fonction pour mettre à jour l'interface selon le modèle
 function updateUI() {
     if (currentModel === "caskun.glb") {
-        // Afficher les infobulles et les sphères
-        for (let key in spheres) {
-            spheres[key].description_label.element.style.visibility = "visible";
-            spheres[key].mesh.visible = true;
+        for (let key in infosbulles) {
+            infosbulles[key].description_label.element.style.visibility = "visible";
+            infosbulles[key].mesh.visible = true;
         }
         shakeButton.style.display = "none";
         graphContainer.style.display = "none";
     } else if (currentModel === "cask.glb") {
-        // Cacher les infobulles et les sphères
-        for (let key in spheres) {
-            spheres[key].description_label.element.style.visibility = "hidden";
-            spheres[key].mesh.visible = false;
+        for (let key in infosbulles) {
+            infosbulles[key].description_label.element.style.visibility = "hidden";
+            infosbulles[key].mesh.visible = false;
         }
         shakeButton.style.display = "block";
         graphContainer.style.display = "block";
         
-        // Initialiser le graphique si ce n'est pas déjà fait
         if (!shockChart) {
             initializeGraph();
         }
-        updateGraph(); // Réinitialiser le graphique
+        updateGraph(); 
     }
 }
 
-
-// Charger le modèle initial
 loadModel(currentModel);
 
-// Gestion du bouton Switch Model
 switchModelButton.addEventListener("click", () => {
-    // Alterner entre "cask.glb" et "caskun.glb"
     currentModel = currentModel === "cask.glb" ? "caskun.glb" : "cask.glb";
     loadModel(currentModel);
 });
 
-// Gestion du bouton Shake
 shakeButton.addEventListener("click", () => {
     console.log("Shake button clicked!");
     if (caskModel) {
-        // Animation de secouement
         gsap.to(caskModel.position, {
             x: 0.1,
             y: 0.1,
@@ -371,14 +373,11 @@ shakeButton.addEventListener("click", () => {
             yoyo: true,
             repeat: 5,
             duration: 0.1,
-            onStart: () => updateGraph(true), // Mettre à jour le graphique avec des données de secousse
-            onComplete: () => updateGraph(false) // Réinitialiser le graphique
+            onStart: () => updateGraph(true), 
+            onComplete: () => updateGraph(false) 
         });
     }
 });
-
-
-// -------------------------------------END CONNERIES-------------------------------------
 
 main_group.position.set(0, -0.5, 0);
 scene.add(main_group);
@@ -396,10 +395,8 @@ function getIntersectedSphere(event){
 
 
     if (intersected_objects.length > 0){
-        // let intersected_object = intersected_objects[0].object;
-        // Get the class of the intersected object
         let intersected_object = intersected_objects[0].object;
-        let clickedSphere = Object.values(spheres).find(sphere => sphere.mesh === intersected_object);
+        let clickedSphere = Object.values(infosbulles).find(sphere => sphere.mesh === intersected_object);
         return clickedSphere;
     }
     return false;
@@ -413,17 +410,16 @@ function pointerMove(event){
         clickedSphere.onHover();
         target_velocity = 0;
     }else{
-        // Put all spheres back to default state
-        for (let key in spheres){
-            spheres[key].defaultState();
+        for (let key in infosbulles){
+            infosbulles[key].defaultState();
             target_velocity = velocity_default;
         }
     }
         
     
     if (clickedSphere === false){
-    for (let key in spheres){
-        spheres[key].defaultState();
+    for (let key in infosbulles){
+        infosbulles[key].defaultState();
         target_velocity = velocity_default;
     }
 }
